@@ -1,0 +1,14 @@
+step: 1
+name: search_workflow_only
+campaign_key: step1
+flowcept_settings:
+  project:
+    enrich_messages: false
+  instrumentation:
+    enabled: false
+workflow:
+  with_flowcept: true
+  with_persistence: true
+  expected_workflows:
+    - SearchWorkflow
+  min_tasks: 1

@@ -1,0 +1,19 @@
+condition: baseline
+description: Script-only ML workflow execution without Codex agent provenance capture.
+flowcept_settings:
+  capture:
+    codex_adapter_enabled: false
+    declared_provenance_enabled: false
+  instrumentation:
+    enabled: true
+    torch:
+      what: null
+      children_mode: null
+      epoch_loop: null
+      batch_loop: null
+      capture_epochs_at_every: 1
+      register_workflow: false
+expected:
+  codex_adapter: false
+  dpl_entities: false
+  plan_steps: false

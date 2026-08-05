@@ -1,0 +1,80 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from .config import git_commit, load_project, make_run_id, python_env, run_dir, utc_now, write_yaml
+from .paths import DEFAULT_RUN_ROOT, ROOT
+
+
+REQUIRED_FIELDS = [
+    "run_id",
+    "condition",
+    "repetition",
+    "profile",
+    "campaign_id",
+    "mongo_db",
+    "settings_path",
+    "start_time",
+    "status",
+]
+
+
+def build_manifest(
+    condition: str,
+    repetition: int,
+    profile: str,
+    mongo_db: str | None = None,
+    codex_jsonl: str | None = None,
+    prompt_path: str | None = None,
+    run_id: str | None = None,
+) -> dict[str, Any]:
+    project = load_project()
+    rid = run_id or make_run_id(condition, repetition, profile)
+    db_name = mongo_db or f"pal_{rid}"
+    campaign_id = f"pal:{profile}:{condition}:r{repetition}:{rid}"
+    rdir = run_dir(rid)
+    flowcept_source = Path(project["project"].get("flowcept_source", "/Users/valesca/Documents/projects/valescamoura/flowcept"))
+    tutorial_root = Path(project["project"].get("tutorial_root", ""))
+    return {
+        "run_id": rid,
+        "condition": condition,
+        "repetition": repetition,
+        "profile": profile,
+        "campaign_id": campaign_id,
+        "mongo_db": db_name,
+        "codex_jsonl": codex_jsonl,
+        "settings_path": str(rdir / "flowcept-settings.yaml"),
+        "prompt_path": prompt_path,
+        "start_time": utc_now(),
+        "end_time": None,
+        "status": "created",
+        "repo_commits": {
+            "experiment_repo": git_commit(ROOT),
+            "flowcept_source": git_commit(flowcept_source),
+            "llm_tutorial_repo": git_commit(tutorial_root) if tutorial_root.exists() else None,
+        },
+        "workflow_params": project.get("workflow_params", {}),
+        "search_bounds": project.get("experiment", {}).get("search_bounds", {}),
+        "environment": python_env(),
+        "notes": [],
+    }
+
+
+def validate_manifest(manifest: dict[str, Any]) -> list[str]:
+    return [field for field in REQUIRED_FIELDS if not manifest.get(field)]
+
+
+def save_manifest(manifest: dict[str, Any], root: Path = DEFAULT_RUN_ROOT) -> Path:
+    path = root / manifest["run_id"] / "manifest.yaml"
+    write_yaml(path, manifest)
+    return path
+
+
+def load_manifest(path_or_run_id: str) -> dict[str, Any]:
+    from .config import read_yaml
+
+    candidate = Path(path_or_run_id)
+    if candidate.exists():
+        return read_yaml(candidate)
+    return read_yaml(DEFAULT_RUN_ROOT / path_or_run_id / "manifest.yaml")

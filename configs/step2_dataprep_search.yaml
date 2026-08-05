@@ -1,0 +1,22 @@
+step: 2
+name: dataprep_plus_search_workflow
+campaign_key: step2
+flowcept_settings:
+  project:
+    enrich_messages: false
+  instrumentation:
+    enabled: true
+    torch:
+      what: null
+      children_mode: null
+      epoch_loop: null
+      batch_loop: null
+      capture_epochs_at_every: 1
+      register_workflow: false
+workflow:
+  with_flowcept: true
+  with_persistence: true
+  expected_workflows:
+    - DataPrepWorkflow
+    - SearchWorkflow
+  min_tasks: 1

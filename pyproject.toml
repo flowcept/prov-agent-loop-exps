@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prov-agent-loop-exps"
+version = "0.1.0"
+description = "End-to-end local harness for PROV-Agent-Loop Flowcept experiments."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "flowcept[ml_dev,extras,dask,codex,telemetry] @ git+https://github.com/valescamoura/flowcept.git@agent_loop",
+  "matplotlib>=3.8",
+  "networkx>=3.2",
+  "orjson>=3.9",
+  "pandas>=2.1",
+  "psutil>=5.9",
+  "pyarrow>=14",
+  "pymongo>=4.6",
+  "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+]
+
+[project.scripts]
+pal-build-metrics = "pal_exps.cli:build_metrics"
+pal-export-run = "pal_exps.cli:export_run"
+pal-import-run = "pal_exps.cli:import_run"
+pal-query-suite = "pal_exps.cli:query_suite"
+pal-run-local = "pal_exps.cli:run_local"
+pal-start-adapter = "pal_exps.cli:start_adapter"
+
+[tool.setuptools]
+py-modules = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pal_exps*"]

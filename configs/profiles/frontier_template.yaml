@@ -1,0 +1,12 @@
+profile: frontier_validation
+description: Frontier validation profile for the paper-scale LLM tutorial campaign.
+repetitions: 3
+workflow_params:
+  subset_size: null
+  epochs: 4
+  max_runs: null
+  random_seed: 0
+notes:
+  - This profile documents intended Frontier validation scale; do not run it locally unchanged.
+  - Frontier-specific queue, allocation, modules, and Slurm scripts are created during the Frontier session.
+  - Run beyond local Step 2 smoke: include training, validation metrics/losses, checkpoints or model artifacts, Slurm records, node-hours, and telemetry evidence.

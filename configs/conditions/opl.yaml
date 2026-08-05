@@ -1,0 +1,13 @@
+condition: opl
+description: Observed provenance from deterministic Codex JSONL structure plus ML workflow capture.
+flowcept_settings:
+  capture:
+    codex_adapter_enabled: true
+    declared_provenance_enabled: false
+  adapters:
+    codex:
+      declared_provenance_enabled: false
+expected:
+  codex_adapter: true
+  dpl_entities: false
+  plan_steps: false

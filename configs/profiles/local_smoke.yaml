@@ -1,0 +1,27 @@
+profile: local_smoke
+description: Small desktop-scale run through tutorial step 2, before per-epoch training analysis.
+repetitions: 3
+workflow_params:
+  batch_size: 20
+  eval_batch_size: 10
+  emsize:
+    - 64
+  nhid:
+    - 64
+  nlayers:
+    - 1
+  nhead:
+    - 2
+  dropout:
+    - 0.2
+  lr:
+    - 0.1
+    - 0.01
+  pos_encoding_max_len:
+    - 256
+  subset_size: 10
+  epochs: 1
+  max_runs: 2
+  random_seed: 0
+  tokenizer_type: basic_english
+  dask_map_gpus: false

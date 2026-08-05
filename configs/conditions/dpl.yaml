@@ -1,0 +1,13 @@
+condition: dpl
+description: OPL plus declared provenance annotations emitted by the code assistant.
+flowcept_settings:
+  capture:
+    codex_adapter_enabled: true
+    declared_provenance_enabled: true
+  adapters:
+    codex:
+      declared_provenance_enabled: true
+expected:
+  codex_adapter: true
+  dpl_entities: true
+  plan_steps: true

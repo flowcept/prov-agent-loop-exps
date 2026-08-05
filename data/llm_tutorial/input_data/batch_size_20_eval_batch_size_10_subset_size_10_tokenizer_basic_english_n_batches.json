@@ -1,0 +1,5 @@
+{
+  "train_n_batches": 2,
+  "val_n_batches": 5,
+  "test_n_batches": 5
+}

@@ -1,0 +1,121 @@
+{
+  "train": {
+    "description": "",
+    "citation": "",
+    "homepage": "",
+    "license": "",
+    "features": {
+      "text": "Value_instance_id_4750669728"
+    },
+    "post_processed": null,
+    "supervised_keys": null,
+    "task_templates": null,
+    "builder_name": "parquet",
+    "dataset_name": "wikitext",
+    "config_name": "wikitext-2-v1",
+    "version": "Version_instance_id_4750671552",
+    "splits": {
+      "test": "SplitInfo_instance_id_4750671600",
+      "train": "SplitInfo_instance_id_4750671408",
+      "validation": "SplitInfo_instance_id_4750667472"
+    },
+    "download_checksums": {
+      "hf://datasets/wikitext@b08601e04326c79dfdd32d625aee71d232d685c3/wikitext-2-v1/test-00000-of-00001.parquet": {
+        "num_bytes": 685430,
+        "checksum": null
+      },
+      "hf://datasets/wikitext@b08601e04326c79dfdd32d625aee71d232d685c3/wikitext-2-v1/train-00000-of-00001.parquet": {
+        "num_bytes": 6068114,
+        "checksum": null
+      },
+      "hf://datasets/wikitext@b08601e04326c79dfdd32d625aee71d232d685c3/wikitext-2-v1/validation-00000-of-00001.parquet": {
+        "num_bytes": 617738,
+        "checksum": null
+      }
+    },
+    "download_size": 7371282,
+    "post_processing_size": null,
+    "dataset_size": 13323188,
+    "size_in_bytes": 20694470
+  },
+  "val": {
+    "description": "",
+    "citation": "",
+    "homepage": "",
+    "license": "",
+    "features": {
+      "text": "Value_instance_id_4750867008"
+    },
+    "post_processed": null,
+    "supervised_keys": null,
+    "task_templates": null,
+    "builder_name": "parquet",
+    "dataset_name": "wikitext",
+    "config_name": "wikitext-2-v1",
+    "version": "Version_instance_id_4750866912",
+    "splits": {
+      "test": "SplitInfo_instance_id_4750852272",
+      "train": "SplitInfo_instance_id_4750860288",
+      "validation": "SplitInfo_instance_id_4750865184"
+    },
+    "download_checksums": {
+      "hf://datasets/wikitext@b08601e04326c79dfdd32d625aee71d232d685c3/wikitext-2-v1/test-00000-of-00001.parquet": {
+        "num_bytes": 685430,
+        "checksum": null
+      },
+      "hf://datasets/wikitext@b08601e04326c79dfdd32d625aee71d232d685c3/wikitext-2-v1/train-00000-of-00001.parquet": {
+        "num_bytes": 6068114,
+        "checksum": null
+      },
+      "hf://datasets/wikitext@b08601e04326c79dfdd32d625aee71d232d685c3/wikitext-2-v1/validation-00000-of-00001.parquet": {
+        "num_bytes": 617738,
+        "checksum": null
+      }
+    },
+    "download_size": 7371282,
+    "post_processing_size": null,
+    "dataset_size": 13323188,
+    "size_in_bytes": 20694470
+  },
+  "test": {
+    "description": "",
+    "citation": "",
+    "homepage": "",
+    "license": "",
+    "features": {
+      "text": "Value_instance_id_4750865664"
+    },
+    "post_processed": null,
+    "supervised_keys": null,
+    "task_templates": null,
+    "builder_name": "parquet",
+    "dataset_name": "wikitext",
+    "config_name": "wikitext-2-v1",
+    "version": "Version_instance_id_4750865040",
+    "splits": {
+      "test": "SplitInfo_instance_id_4750923904",
+      "train": "SplitInfo_instance_id_4750932880",
+      "validation": "SplitInfo_instance_id_4750927024"
+    },
+    "download_checksums": {
+      "hf://datasets/wikitext@b08601e04326c79dfdd32d625aee71d232d685c3/wikitext-2-v1/test-00000-of-00001.parquet": {
+        "num_bytes": 685430,
+        "checksum": null
+      },
+      "hf://datasets/wikitext@b08601e04326c79dfdd32d625aee71d232d685c3/wikitext-2-v1/train-00000-of-00001.parquet": {
+        "num_bytes": 6068114,
+        "checksum": null
+      },
+      "hf://datasets/wikitext@b08601e04326c79dfdd32d625aee71d232d685c3/wikitext-2-v1/validation-00000-of-00001.parquet": {
+        "num_bytes": 617738,
+        "checksum": null
+      }
+    },
+    "download_size": 7371282,
+    "post_processing_size": null,
+    "dataset_size": 13323188,
+    "size_in_bytes": 20694470
+  },
+  "dataset_ref": 4359334208,
+  "dataset_local_file_download_time": "Wed Aug  5 12:05:50 2026"
+}
