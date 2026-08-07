@@ -73,6 +73,14 @@ def generate_settings(condition: str, manifest: dict[str, Any], output_path: Pat
     settings["databases"]["mongodb"]["port"] = int(mongo.get("port", 27017))
     cond = condition_config(condition)
     settings = deep_merge(settings, cond.get("flowcept_settings", {}))
+    settings["campaign"] = {
+        **settings.get("campaign", {}),
+        "id": manifest.get("campaign_id"),
+        "run_id": manifest.get("run_id"),
+        "condition": condition,
+        "repetition": manifest.get("repetition"),
+        "profile": manifest.get("profile"),
+    }
     if condition == "baseline":
         settings["capture"]["codex_adapter_enabled"] = False
     path = output_path or Path(manifest["settings_path"])

@@ -115,11 +115,18 @@ The command above does not run Codex, the workflow, or the adapter. It only crea
 
 - `runs/local/<run_id>/manifest.yaml`
 - `runs/local/<run_id>/flowcept-settings.yaml`
+- `runs/local/<run_id>/run.env`
+
+Load the generated run variables instead of copying ids manually:
+
+```bash
+source runs/local/<run_id>/run.env
+```
 
 Consume the JSONL with the adapter:
 
 ```bash
-.venv/bin/python scripts/capture/measure_ingestion.py --run-id <run_id> --duration-sec 5
+.venv/bin/python scripts/capture/measure_ingestion.py --run-id "$PAL_RUN_ID" --duration-sec 5
 ```
 
 This command starts the Flowcept Codex adapter using `runs/local/<run_id>/flowcept-settings.yaml`.
@@ -146,7 +153,8 @@ Create the run manifest/settings with that JSONL, then start the adapter for a l
 
 ```bash
 .venv/bin/python scripts/run/create_manifest.py --condition dpl --repetition 1 --profile local_smoke --codex-jsonl /path/to/new/session.jsonl
-.venv/bin/python scripts/capture/measure_ingestion.py --run-id <run_id> --duration-sec 100000
+source runs/local/<run_id>/run.env
+.venv/bin/python scripts/capture/measure_ingestion.py --run-id "$PAL_RUN_ID" --duration-sec 100000
 ```
 
 Return to the same Codex session and send the real experiment prompt from `prompts/codex_dpl.md`.
@@ -166,15 +174,15 @@ Replay or watch a Codex JSONL for OPL/DPL after creating the run:
 Build query outputs and metrics:
 
 ```bash
-.venv/bin/python scripts/analysis/run_query_suite.py --run-id <run_id>
-.venv/bin/python scripts/analysis/build_metrics.py --run-id <run_id>
+.venv/bin/python scripts/analysis/run_query_suite.py --run-id "$PAL_RUN_ID"
+.venv/bin/python scripts/analysis/build_metrics.py --run-id "$PAL_RUN_ID"
 .venv/bin/python scripts/analysis/build_metrics.py --all
 ```
 
 Export a run package, including the Mongo database collections:
 
 ```bash
-.venv/bin/python scripts/capture/export_run.py --run-id <run_id>
+.venv/bin/python scripts/capture/export_run.py --run-id "$PAL_RUN_ID"
 ```
 
 `scripts/capture/export_mongo.py` is an explicit alias for the same run package export. The package is written to `runs/local/<run_id>/export/` and contains:
