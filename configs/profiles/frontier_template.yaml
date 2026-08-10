@@ -2,6 +2,30 @@ profile: frontier_validation
 description: Frontier validation profile for the LLM tutorial campaign.
 repetitions: 3
 run_root: runs/frontier
+mongo:
+  host: login12
+  port: 27017
+redis:
+  host: login07
+  port: 6379
+flowcept_settings:
+  project:
+    enrich_messages: true
+  telemetry_capture:
+    gpu:
+      - used
+      - activity
+      - power
+      - temperature
+  instrumentation:
+    torch:
+      enabled: false
+  mq:
+    bin: /ccs/home/mourav/redis-stable/src/redis-server
+    conf_file: /autofs/nccs-svm1_home1/mourav/flowcept/deployment/redis_conf/redis.conf
+  databases:
+    lmdb:
+      path: /autofs/nccs-svm1_home1/mourav/prov-agent-loop-exps/lmdb
 constraints:
   max_requested_nodes: 10
   campaign_wall_time_minutes: 30

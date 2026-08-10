@@ -11,12 +11,14 @@ It does not contain fixed scripts for the machine-learning use case. The code as
 
 MongoDB and Redis must be running before capture starts. It does not matter how you start them: Docker, Homebrew, system services, site modules, or Flowcept utilities are all fine.
 
-Default ports are configured in `project.yaml`:
+Default local ports are configured in `project.yaml`:
 
 - MongoDB: `localhost:27017`
 - Redis: `localhost:6379`
 
-If needed, edit `project.yaml` before creating a manifest.
+Frontier manifests created with `--profile frontier_template` automatically generate Flowcept settings that persist to MongoDB at `login12:27017`. Redis still defaults to `localhost:6379` unless overridden.
+
+If needed for local/debug runs, edit `project.yaml` before creating a manifest.
 
 One Docker option is:
 
@@ -101,6 +103,8 @@ Create the Frontier run manifest and Flowcept settings:
   --codex-jsonl <path-to-rollout.jsonl> \
   --prompt-path prompts/frontier_handoff.md
 ```
+
+For Frontier, the generated `flowcept-settings.yaml` points to MongoDB at `login12:27017` and creates a unique database name for that run.
 
 Parameters:
 

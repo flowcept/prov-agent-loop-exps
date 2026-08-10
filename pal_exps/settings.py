@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .config import condition_config, load_project, write_yaml
+from .config import condition_config, load_project, profile_config, write_yaml
 from .manifest import manifest_run_dir
 from .paths import ROOT
 
@@ -20,7 +20,7 @@ def base_flowcept_settings(mongo_db: str, condition: str, codex_jsonl: str | Non
             "db_flush_mode": "online",
         },
         "telemetry_capture": {},
-        "instrumentation": {"enabled": True, "torch": {"what": None, "children_mode": None, "epoch_loop": None, "batch_loop": None, "capture_epochs_at_every": 1, "register_workflow": False}},
+        "instrumentation": {"enabled": True, "torch": {"enabled": False, "what": None, "children_mode": None, "epoch_loop": None, "batch_loop": None, "capture_epochs_at_every": 1, "register_workflow": False}},
         "experiment": {},
         "mq": {"enabled": True, "type": "redis", "host": "localhost", "port": 6379, "channel": "interception", "buffer_size": 50},
         "kv_db": {"enabled": True, "host": "localhost", "port": 6379},
@@ -69,18 +69,24 @@ def deep_merge(base: dict[str, Any], update: dict[str, Any]) -> dict[str, Any]:
 
 def generate_settings(condition: str, manifest: dict[str, Any], output_path: Path | None = None) -> Path:
     project = load_project()
+    profile = profile_config(manifest.get("profile", ""))
     mongo = project.get("mongo", {})
     redis = project.get("redis", {})
+    profile_mongo = profile.get("mongo", {})
+    profile_redis = profile.get("redis", {})
     settings = base_flowcept_settings(manifest["mongo_db"], condition, manifest.get("codex_jsonl"))
-    settings["databases"]["mongodb"]["host"] = mongo.get("host", "localhost")
-    settings["databases"]["mongodb"]["port"] = int(mongo.get("port", 27017))
-    settings["mq"]["host"] = redis.get("host", "localhost")
-    settings["mq"]["port"] = int(redis.get("port", 6379))
-    settings["kv_db"]["host"] = redis.get("host", "localhost")
-    settings["kv_db"]["port"] = int(redis.get("port", 6379))
-    settings["project"]["dump_buffer"]["path"] = str(manifest_run_dir(manifest) / "flowcept-buffer.jsonl")
+    settings["databases"]["mongodb"]["host"] = profile_mongo.get("host", mongo.get("host", "localhost"))
+    settings["databases"]["mongodb"]["port"] = int(profile_mongo.get("port", mongo.get("port", 27017)))
+    settings["mq"]["host"] = profile_redis.get("host", redis.get("host", "localhost"))
+    settings["mq"]["port"] = int(profile_redis.get("port", redis.get("port", 6379)))
+    settings["kv_db"]["host"] = profile_redis.get("host", redis.get("host", "localhost"))
+    settings["kv_db"]["port"] = int(profile_redis.get("port", redis.get("port", 6379)))
+    settings = deep_merge(settings, profile.get("flowcept_settings", {}))
     cond = condition_config(condition)
     settings = deep_merge(settings, cond.get("flowcept_settings", {}))
+    settings["project"]["dump_buffer"]["path"] = str(manifest_run_dir(manifest) / "flowcept-buffer.jsonl")
+    settings["databases"]["mongodb"]["db"] = manifest["mongo_db"]
+    settings["adapters"]["codex"]["file_path"] = manifest.get("codex_jsonl") or "codex_events.jsonl"
     settings["campaign"] = {
         **settings.get("campaign", {}),
         "id": manifest.get("campaign_id"),
