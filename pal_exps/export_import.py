@@ -6,9 +6,10 @@ import shutil
 from pathlib import Path
 
 from .config import load_project, read_yaml, utc_now, write_yaml
-from .manifest import load_manifest
+from .manifest import load_manifest, manifest_run_dir
 from .mongo import collection_names, database, dump_collection, restore_collection, write_json
-from .paths import DEFAULT_RUN_ROOT
+from .paths import DEFAULT_RUN_ROOT, ROOT
+from .validation import validate_run
 
 
 def _copy_file_if_exists(src: Path, dst: Path) -> None:
@@ -24,26 +25,38 @@ def _copy_tree_if_exists(src: Path, dst: Path) -> None:
         shutil.copytree(src, dst)
 
 
-def export_package(run_id: str, output_dir: str | None = None) -> Path:
+def _copy_run_files(run_path: Path, dst: Path) -> None:
+    if dst.exists():
+        shutil.rmtree(dst)
+    ignore = shutil.ignore_patterns("export", "__pycache__", "*.pyc")
+    shutil.copytree(run_path, dst, ignore=ignore)
+
+
+def export_package(run_id: str, output_dir: str | None = None, allow_invalid: bool = False) -> Path:
     manifest = load_manifest(run_id)
     project = load_project()
-    run_path = DEFAULT_RUN_ROOT / manifest["run_id"]
+    run_path = manifest_run_dir(manifest)
     out = Path(output_dir) if output_dir else run_path / "export"
     out.mkdir(parents=True, exist_ok=True)
+    validation = validate_run(run_id)
+    write_yaml(out / "validation.yaml", validation)
+    if not validation["ok"] and not allow_invalid:
+        raise ValueError(
+            "Run failed validation; refusing to export as a valid package. "
+            f"Errors: {validation['errors']}. Use --allow-invalid to export for debugging."
+        )
     write_yaml(out / "manifest.yaml", manifest)
-    for name in ["flowcept-settings.yaml", "runtime_metrics.yaml", "ingestion_metrics.yaml"]:
+    for name in ["flowcept-settings.yaml", "search_config.yaml", "run_summary.md", "runtime_metrics.yaml", "ingestion_metrics.yaml", "ingestion_metrics.partial.yaml"]:
         src = run_path / name
         _copy_file_if_exists(src, out / name)
     _copy_tree_if_exists(run_path / "analysis", out / "analysis")
+    _copy_run_files(run_path, out / "run_files")
     if manifest.get("codex_jsonl") and Path(manifest["codex_jsonl"]).exists():
         shutil.copy2(manifest["codex_jsonl"], out / "codex.jsonl")
     db = database(project["mongo"], manifest["mongo_db"])
     mongo_dir = out / "mongo"
     for collection in collection_names(db):
         docs = dump_collection(db, collection)
-        campaign_id = manifest.get("campaign_id")
-        if campaign_id and any("campaign_id" in doc for doc in docs):
-            docs = [doc for doc in docs if doc.get("campaign_id") == campaign_id]
         write_json(mongo_dir / f"{collection}.json", docs)
     return out
 
@@ -63,13 +76,17 @@ def import_package(package_dir: str, db_name: str, register_run: bool = True) ->
     manifest["imported_as_mongo_db"] = db_name
     manifest["imported_from_package"] = str(package.resolve())
     manifest["imported_at"] = utc_now()
+    run_root = manifest.get("run_root")
+    if run_root and Path(run_root).is_absolute():
+        manifest["original_run_root"] = run_root
+        manifest["run_root"] = str(DEFAULT_RUN_ROOT.relative_to(ROOT))
     write_yaml(package / "imported_manifest.yaml", manifest)
     registered_manifest: str | None = None
     if register_run:
-        run_path = DEFAULT_RUN_ROOT / manifest["run_id"]
+        run_path = manifest_run_dir(manifest)
         write_yaml(run_path / "manifest.yaml", manifest)
         registered_manifest = str((run_path / "manifest.yaml").resolve())
-        for name in ["flowcept-settings.yaml", "runtime_metrics.yaml", "ingestion_metrics.yaml"]:
+        for name in ["flowcept-settings.yaml", "search_config.yaml", "run_summary.md", "runtime_metrics.yaml", "ingestion_metrics.yaml", "ingestion_metrics.partial.yaml"]:
             _copy_file_if_exists(package / name, run_path / name)
         _copy_tree_if_exists(package / "analysis", run_path / "analysis")
         _copy_file_if_exists(package / "codex.jsonl", run_path / "codex.jsonl")
@@ -80,8 +97,9 @@ def export_main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Export a run package with Mongo data and run artifacts.")
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--output-dir", default=None)
+    parser.add_argument("--allow-invalid", action="store_true", help="Export even if run/campaign validation fails. Use only for debugging.")
     args = parser.parse_args(argv)
-    print(export_package(args.run_id, args.output_dir))
+    print(export_package(args.run_id, args.output_dir, allow_invalid=args.allow_invalid))
 
 
 def import_main(argv: list[str] | None = None) -> None:
@@ -91,7 +109,7 @@ def import_main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--no-register-run",
         action="store_true",
-        help="Restore Mongo only; do not create runs/local/<run_id>/manifest.yaml for analysis scripts.",
+        help="Restore Mongo only; do not register a run manifest for analysis scripts.",
     )
     args = parser.parse_args(argv)
     print(

@@ -1,11 +1,18 @@
 profile: frontier_validation
-description: Frontier validation profile for the paper-scale LLM tutorial campaign.
+description: Frontier validation profile for the LLM tutorial campaign.
 repetitions: 3
-workflow_params:
-  subset_size: null
-  epochs: 4
-  max_runs: null
-  random_seed: 0
+run_root: runs/frontier
+constraints:
+  max_requested_nodes: 10
+  campaign_wall_time_minutes: 30
+search_config_hint:
+  description: The code assistant should generate runs/frontier/<run_id>/search_config.yaml for each Frontier run.
+  required_sections:
+    - objective
+    - constraints
+    - search_space_rationale
+    - generated_run_artifacts
+    - evaluation_plan
 notes:
   - This profile documents intended Frontier validation scale; do not run it locally unchanged.
   - Frontier-specific queue, allocation, modules, and Slurm scripts are created during the Frontier session.

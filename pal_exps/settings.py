@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from .config import condition_config, load_project, write_yaml
+from .manifest import manifest_run_dir
+from .paths import ROOT
 
 
 def base_flowcept_settings(mongo_db: str, condition: str, codex_jsonl: str | None = None) -> dict[str, Any]:
@@ -68,9 +70,15 @@ def deep_merge(base: dict[str, Any], update: dict[str, Any]) -> dict[str, Any]:
 def generate_settings(condition: str, manifest: dict[str, Any], output_path: Path | None = None) -> Path:
     project = load_project()
     mongo = project.get("mongo", {})
+    redis = project.get("redis", {})
     settings = base_flowcept_settings(manifest["mongo_db"], condition, manifest.get("codex_jsonl"))
     settings["databases"]["mongodb"]["host"] = mongo.get("host", "localhost")
     settings["databases"]["mongodb"]["port"] = int(mongo.get("port", 27017))
+    settings["mq"]["host"] = redis.get("host", "localhost")
+    settings["mq"]["port"] = int(redis.get("port", 6379))
+    settings["kv_db"]["host"] = redis.get("host", "localhost")
+    settings["kv_db"]["port"] = int(redis.get("port", 6379))
+    settings["project"]["dump_buffer"]["path"] = str(manifest_run_dir(manifest) / "flowcept-buffer.jsonl")
     cond = condition_config(condition)
     settings = deep_merge(settings, cond.get("flowcept_settings", {}))
     settings["campaign"] = {
@@ -84,5 +92,7 @@ def generate_settings(condition: str, manifest: dict[str, Any], output_path: Pat
     if condition == "baseline":
         settings["capture"]["codex_adapter_enabled"] = False
     path = output_path or Path(manifest["settings_path"])
+    if not path.is_absolute():
+        path = ROOT / path
     write_yaml(path, settings)
     return path

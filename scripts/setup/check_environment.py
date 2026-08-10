@@ -30,13 +30,13 @@ def main() -> int:
         return 2
     project = yaml.safe_load((ROOT / "project.yaml").read_text()) or {}
     mongo = project.get("mongo", {})
+    redis_conf = project.get("redis", {})
     result = {
         "python": sys.version,
         "executable": sys.executable,
         "imports": [check_import(name) for name in ["flowcept", "pymongo", "yaml", "pandas", "pyarrow", "psutil"]],
         "mongo": {"ok": False, "host": mongo.get("host", "localhost"), "port": mongo.get("port", 27017)},
-        "redis": {"ok": False, "host": "localhost", "port": 6379},
-        "tutorial_root_exists": Path(project.get("project", {}).get("tutorial_root", "")).exists(),
+        "redis": {"ok": False, "host": redis_conf.get("host", "localhost"), "port": redis_conf.get("port", 6379)},
     }
     try:
         client = MongoClient(mongo.get("host", "localhost"), int(mongo.get("port", 27017)), serverSelectionTimeoutMS=5000)
@@ -47,12 +47,12 @@ def main() -> int:
     try:
         import redis
 
-        redis.Redis(host="localhost", port=6379, socket_connect_timeout=2).ping()
+        redis.Redis(host=redis_conf.get("host", "localhost"), port=int(redis_conf.get("port", 6379)), socket_connect_timeout=2).ping()
         result["redis"]["ok"] = True
     except Exception as exc:
         result["redis"]["error"] = repr(exc)
     print(json.dumps(result, indent=2, sort_keys=True))
-    ok = result["mongo"]["ok"] and result["redis"]["ok"] and result["tutorial_root_exists"] and all(item["ok"] for item in result["imports"])
+    ok = result["mongo"]["ok"] and result["redis"]["ok"] and all(item["ok"] for item in result["imports"])
     return 0 if ok else 2
 
 

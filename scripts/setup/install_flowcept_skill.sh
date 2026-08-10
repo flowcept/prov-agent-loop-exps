@@ -10,12 +10,6 @@ import sys
 
 import yaml
 
-project = yaml.safe_load(Path(sys.argv[1]).read_text()) or {}
-configured = project.get("project", {}).get("flowcept_source")
-if configured and Path(configured).exists():
-    print(configured)
-    raise SystemExit(0)
-
 try:
     import flowcept
 except Exception:

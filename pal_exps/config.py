@@ -34,7 +34,7 @@ def load_project(path: Path = PROJECT_YAML) -> dict[str, Any]:
     data = read_yaml(path)
     data.setdefault("project", {})
     data.setdefault("mongo", {})
-    data.setdefault("workflow_params", {})
+    data.setdefault("redis", {})
     data.setdefault("experiment", {})
     return data
 

@@ -1,13 +1,8 @@
 project:
-  name: prov-agent-loop-llm-local
-  description: Local and reusable harness for PROV-Agent-Loop Flowcept experiments.
-  tutorial_root: /Users/valesca/Documents/projects/github.com/valescamoura/umbrella/flowcept/examples/llm_tutorial
-  flowcept_source: /Users/valesca/Documents/projects/valescamoura/flowcept
+  name: prov-agent-loop-exps
+  description: Reusable capture, packaging, and analysis harness for PROV-Agent-Loop Flowcept experiments.
   flowcept_git_url: https://github.com/valescamoura/flowcept.git
   flowcept_git_branch: agent_loop
-  settings_path: /Users/valesca/Documents/projects/valescamoura/flowcept/flowcept-codex-settings.yaml
-  output_root: runs/local
-  data_root: data/llm_tutorial
 
 mongo:
   host: localhost
@@ -19,56 +14,11 @@ mongo:
     objects: objects
     agents: agents
 
+redis:
+  host: localhost
+  port: 6379
+
 experiment:
   default_profile: local_smoke
   default_repetitions: 3
-  search_bounds:
-    tutorial_steps:
-      - 1
-      - 2
-    excluded:
-      - per_epoch_capture
-      - parent_forward_capture
-      - child_layer_capture
-      - frontier_slurm_generation
-
-campaigns:
-  step1:
-    campaign_id: llm-local-step1-smoke
-    label: Search Workflow only
-    config: configs/step1_search_only.yaml
-  step2:
-    campaign_id: llm-local-step2-smoke
-    label: Data Prep plus Search Workflow
-    config: configs/step2_dataprep_search.yaml
-
-workflow_params:
-  input_data_dir: /Users/valesca/Documents/projects/github.com/flowcept/prov-agent-loop-exps/data/llm_tutorial/input_data
-  batch_size: 20
-  eval_batch_size: 10
-  emsize:
-    - 64
-  nhid:
-    - 64
-  nlayers:
-    - 1
-  nhead:
-    - 2
-  dropout:
-    - 0.2
-  lr:
-    - 0.1
-    - 0.01
-  pos_encoding_max_len:
-    - 256
-  subset_size: 10
-  epochs: 1
-  max_runs: 2
-  random_seed: 0
-  tokenizer_type: basic_english
-  dask_map_gpus: false
-
-commands:
-  step1: scripts/run_step1.sh
-  step2: scripts/run_step2.sh
-  verify: scripts/verify_mongo.py
+  local_smoke_timeout_sec: 1800

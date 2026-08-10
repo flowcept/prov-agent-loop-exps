@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from pal_exps.local_run import create_run
+from pal_exps.run_setup import create_run
 
 
 def main() -> None:
@@ -19,9 +19,22 @@ def main() -> None:
     parser.add_argument("--mongo-db", default=None)
     parser.add_argument("--codex-jsonl", default=None)
     parser.add_argument("--prompt-path", default=None)
+    parser.add_argument("--run-root", default=None, help="Optional run root, for example runs/local or runs/frontier.")
     args = parser.parse_args()
-    manifest = create_run(args.condition, args.repetition, args.profile, args.mongo_db, args.codex_jsonl, args.prompt_path)
-    print(json.dumps({"run_id": manifest["run_id"], "manifest": f"runs/local/{manifest['run_id']}/manifest.yaml", "settings": manifest["settings_path"]}, indent=2))
+    manifest = create_run(args.condition, args.repetition, args.profile, args.mongo_db, args.codex_jsonl, args.prompt_path, args.run_root)
+    print(
+        json.dumps(
+            {
+                "run_id": manifest["run_id"],
+                "manifest": f"{manifest['run_root']}/{manifest['run_id']}/manifest.yaml",
+                "settings": manifest["settings_path"],
+                "run_env": f"{manifest['run_root']}/{manifest['run_id']}/run.env",
+                "mongo_db": manifest["mongo_db"],
+                "campaign_id": manifest["campaign_id"],
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

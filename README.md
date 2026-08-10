@@ -1,263 +1,302 @@
 # PROV-Agent-Loop Experiments
 
-This repository contains the local experiment harness for the paper evaluation. It prepares Flowcept settings, run manifests, Codex JSONL capture/replay, Mongo export/import, metrics, and the Q1-Q8 query suite.
+This repo contains the reusable experiment harness: environment setup, run manifests, Flowcept settings generation, Codex JSONL ingestion, Mongo export/import, metrics, and Q1-Q8 analysis scripts.
 
-The ML use case is Flowcept's LLM tutorial, but the experiment has two scales:
+It does not contain fixed scripts for the machine-learning use case. The code assistant creates run-specific scripts, configs, logs, and summaries inside each run directory. The main protocol below is written for Frontier:
 
-- `local_smoke`: run only through tutorial Step 2 to validate the harness, adapter, skill, Mongo persistence, export/import, and Q1-Q8 scripts.
-- `frontier_validation`: run the training campaign described in the paper, including Dask data preparation, model training, fixed seeds/search bounds, validation metrics/losses, checkpoints or model artifacts, telemetry, and Slurm/node-hour evidence.
+- Frontier runs: `runs/frontier/<run_id>/`
+- local smoke/debug runs: `runs/local/<run_id>/`
 
-Per-epoch/model-forward/child-layer instrumentation may stay reduced in local smoke, but Frontier validation must produce enough ML, scheduler, resource, and telemetry evidence to answer the paper queries.
+## Services
 
-## Setup
+MongoDB and Redis must be running before capture starts. It does not matter how you start them: Docker, Homebrew, system services, site modules, or Flowcept utilities are all fine.
 
-Start the external services required by Flowcept before running the harness:
+Default ports are configured in `project.yaml`:
 
-- MongoDB at `localhost:27017`.
-- Redis at `localhost:6379`.
+- MongoDB: `localhost:27017`
+- Redis: `localhost:6379`
 
-If your Flowcept settings define service binaries, use the Flowcept CLI:
+If needed, edit `project.yaml` before creating a manifest.
 
-```bash
-flowcept --start-redis
-flowcept --start-mongo
-flowcept --check-services
-```
-
-`flowcept --start-services` is not currently the path used here because the Flowcept command is a placeholder. If MongoDB/Redis are already managed by Docker, Homebrew, modules, or a site service manager, start them with that mechanism and then run:
-
-```bash
-flowcept --check-services
-```
-
-For a local Docker-based fallback, one possible option is:
+One Docker option is:
 
 ```bash
 docker run -d --name flowcept-mongo -p 27017:27017 mongo:7
 docker run -d --name flowcept-redis -p 6379:6379 redis:7
 ```
 
-If the services already exist, start them instead of creating new containers.
+## Install
+
+Create the harness environment:
 
 ```bash
 cd <prov-agent-loop-exps>
 scripts/setup/create_venv.sh
+```
+
+Install Flowcept from the `agent_loop` branch separately:
+
+```bash
+git clone -b agent_loop https://github.com/valescamoura/flowcept.git ../flowcept-agent-loop
+.venv/bin/python -m pip install -e "../flowcept-agent-loop[ml_dev,extras,dask,codex,telemetry]"
+```
+
+Install the provenance skill for DPL runs:
+
+```bash
+FLOWCEPT_ROOT=../flowcept-agent-loop scripts/setup/install_flowcept_skill.sh
+```
+
+Check the environment:
+
+```bash
 .venv/bin/python scripts/setup/check_environment.py
 ```
 
-The primary environment is `.venv` from `pyproject.toml`. Conda is optional. `check_environment.py` verifies Python imports, MongoDB, Redis, and the tutorial path.
-
-Install the Flowcept provenance skill before DPL runs:
-
-```bash
-.venv/bin/python -m pip install -e .
-scripts/setup/install_flowcept_skill.sh
-```
-
-The script copies the canonical skill from Flowcept's `resources/skills/agent-loop-provenance` directory into `~/.codex/skills/agent-loop-provenance/SKILL.md`. Start a new Codex session after installing or updating the skill.
-
 ## Conditions
 
-- `baseline`: script-only ML workflow execution; no Codex provenance capture.
-- `opl`: Codex adapter consumes JSONL with declared provenance disabled.
-- `dpl`: Codex adapter consumes JSONL with declared provenance enabled; use the provenance skill in the Codex session.
+- `baseline`: script/manual workflow run; no Codex JSONL capture.
+- `opl`: Codex JSONL capture with declared provenance disabled.
+- `dpl`: Codex JSONL capture with declared provenance enabled. Start the Codex session with `$agent-loop-provenance`.
 
-## Local Smoke
+For paper repetitions, create a fresh Codex session and a fresh JSONL for each repetition. Replaying the same JSONL is useful for debugging the adapter, but it is not an independent repetition.
 
-Local smoke is intentionally small. It should run only:
+One run must use exactly one campaign id and one Mongo database:
 
-- Step 1: Search workflow.
-- Step 2: Data preparation plus search workflow.
-
-This is not the full paper validation; it is the local check that provenance capture and analysis are wired correctly.
-
-## Running Codex Sessions
-
-For OPL and DPL, each experimental repetition must use a fresh Codex session and therefore a fresh Codex JSONL. Replaying the same JSONL multiple times is useful for adapter debugging, but it is not a paper repetition because it does not expose agent nondeterminism.
-
-Paper-aligned repetitions:
-
-- `repetition 1`: Codex session 1, JSONL 1, run manifest 1.
-- `repetition 2`: Codex session 2, JSONL 2, run manifest 2.
-- `repetition 3`: Codex session 3, JSONL 3, run manifest 3.
-
-The Codex session JSONL is created only after the session starts. You can handle this in two ways.
-
-### Replay After The Session Ends
-
-This is the simplest local workflow. Run the Codex session first, then consume its JSONL afterward.
-
-Start an OPL session:
-
-```bash
-codex "$(cat prompts/codex_opl.md)"
+```text
+run_id -> campaign_id -> mongo_db
 ```
 
-Start a DPL session after installing the skill:
+All Codex provenance, Flowcept workflow records, Dask records, metrics, checkpoints, generated scripts, and summaries for that repetition must use the same `$PAL_CAMPAIGN_ID`.
 
-```bash
-codex "$(cat prompts/codex_dpl.md)"
+## Run Setup
+
+Start a new Codex session first, because the JSONL file only exists after the session begins.
+
+For OPL, send a small initializer:
+
+```text
+hi codex!
 ```
 
-Find the newest Codex session JSONL:
+For DPL, send:
+
+```text
+Use $agent-loop-provenance in this session
+```
+
+Find the newest Codex JSONL:
 
 ```bash
 find "${CODEX_HOME:-$HOME/.codex}/sessions" -type f -name 'rollout-*.jsonl' -print0 | xargs -0 ls -t | head -1
 ```
 
-Then create a run manifest and settings pointing at that JSONL:
+Create the Frontier run manifest and Flowcept settings:
 
 ```bash
-.venv/bin/python scripts/run/create_manifest.py --condition dpl --repetition 1 --profile local_smoke --codex-jsonl /path/to/codex.jsonl
+.venv/bin/python scripts/run/create_manifest.py \
+  --condition dpl \
+  --repetition 1 \
+  --profile frontier_template \
+  --codex-jsonl <path-to-rollout.jsonl> \
+  --prompt-path prompts/frontier_handoff.md
 ```
 
-The command above does not run Codex, the workflow, or the adapter. It only creates:
+Parameters:
 
-- `runs/local/<run_id>/manifest.yaml`
-- `runs/local/<run_id>/flowcept-settings.yaml`
-- `runs/local/<run_id>/run.env`
+- `--condition`: `baseline`, `opl`, or `dpl`.
+- `--repetition`: repetition number, usually `1`, `2`, or `3`.
+- `--profile`: use `frontier_template` for Frontier runs. `local_smoke` is only for desktop smoke/debug runs.
+- `--codex-jsonl`: Codex session JSONL to consume.
+- `--prompt-path`: prompt file used for the code-assistant run.
+- `--mongo-db`: optional override. If omitted, a unique DB name is generated from the run id.
+- `--run-root`: optional override. Frontier defaults to `runs/frontier`; local smoke/debug defaults to `runs/local`.
 
-Load the generated run variables instead of copying ids manually:
+The command only creates infrastructure files:
+
+- `runs/frontier/<run_id>/manifest.yaml`
+- `runs/frontier/<run_id>/flowcept-settings.yaml`
+- `runs/frontier/<run_id>/run.env`
+
+It does not run Codex, run the ML workflow, or choose hyperparameters. The code assistant generates run-specific files later, including `$PAL_SEARCH_CONFIG`.
+
+Source the run environment in every terminal that will use the run variables:
 
 ```bash
-source runs/local/<run_id>/run.env
+source runs/frontier/<run_id>/run.env
 ```
 
-Consume the JSONL with the adapter:
+This exports absolute paths as well as ids. Commands use variables such as `$PAL_RUN_ID`, `$PAL_CAMPAIGN_ID`, `$PAL_MONGO_DB`, `$PAL_RUN_DIR`, `$PAL_RUN_ENV`, `$PAL_SEARCH_CONFIG`, and `$FLOWCEPT_SETTINGS_PATH`.
+
+When prompting Codex, give it the absolute `PAL_RUN_ENV` path and require:
 
 ```bash
-.venv/bin/python scripts/capture/measure_ingestion.py --run-id "$PAL_RUN_ID" --duration-sec 5
+source "$PAL_RUN_ENV"
 ```
 
-This command starts the Flowcept Codex adapter using `runs/local/<run_id>/flowcept-settings.yaml`.
-It consumes the configured Codex JSONL and writes the generated provenance records to the Mongo database named in `runs/local/<run_id>/manifest.yaml`.
-It also writes `runs/local/<run_id>/ingestion_metrics.yaml`.
+Do not let the assistant use a relative `source run.env`; that can silently load an old run from the wrong working directory.
 
-### Online Capture While Codex Runs
+## Capture
 
-Use this when you want to measure ingestion while the session is still active.
-
-First create the Codex session with a minimal prompt:
+Start the adapter in the background before sending the real experiment prompt to Codex:
 
 ```bash
-codex 'Use $agent-loop-provenance in this session'
+nohup .venv/bin/python scripts/capture/measure_ingestion.py \
+  --run-id "$PAL_RUN_ID" \
+  --duration-sec 100000 \
+  > "runs/frontier/$PAL_RUN_ID/adapter.log" 2>&1 &
+echo $! > "runs/frontier/$PAL_RUN_ID/adapter.pid"
 ```
 
-In another terminal, find the newly created JSONL:
+This starts `Flowcept(interceptors="codex", save_workflow=False, campaign_id=$PAL_CAMPAIGN_ID)` using the generated settings file. The settings use online mode, Redis/MQ, MongoDB, and the Codex adapter pointing at the JSONL from the manifest.
+
+While this process is running, return to the same Codex session, enable planning if available, and paste the Frontier experiment prompt:
+
+```text
+$(cat prompts/frontier_handoff.md)
+```
+
+The assistant should create all use-case-specific scripts/configs inside `runs/frontier/<run_id>/`, generate `$PAL_SEARCH_CONFIG`, execute the workflow scope requested by the prompt, evaluate the criteria, and write `$PAL_RUN_SUMMARY`.
+
+When Codex finishes, stop `measure_ingestion.py`:
 
 ```bash
-find "${CODEX_HOME:-$HOME/.codex}/sessions" -type f -name 'rollout-*.jsonl' -print0 | xargs -0 ls -t | head -1
+kill "$(cat runs/frontier/$PAL_RUN_ID/adapter.pid)"
 ```
 
-Create the run manifest/settings with that JSONL, then start the adapter for a longer window:
+If `--duration-sec` expires first, it stops by itself. In both cases it writes:
+
+```text
+runs/frontier/<run_id>/ingestion_metrics.yaml
+```
+
+While it is running, it also updates:
+
+```text
+runs/frontier/<run_id>/ingestion_metrics.partial.yaml
+```
+
+That partial file is a safety snapshot for long/background runs. The final `ingestion_metrics.yaml` is still preferred for analysis because it has final counts and `ended_at`.
+
+For local smoke/debug runs, the same command can be run in the foreground:
 
 ```bash
-.venv/bin/python scripts/run/create_manifest.py --condition dpl --repetition 1 --profile local_smoke --codex-jsonl /path/to/new/session.jsonl
-source runs/local/<run_id>/run.env
-.venv/bin/python scripts/capture/measure_ingestion.py --run-id "$PAL_RUN_ID" --duration-sec 100000
+.venv/bin/python scripts/capture/measure_ingestion.py \
+  --run-id "$PAL_RUN_ID" \
+  --duration-sec 100000
 ```
 
-Return to the same Codex session and send the real experiment prompt from `prompts/codex_dpl.md`.
+The script handles `SIGTERM` and writes the final `ingestion_metrics.yaml`. If the process is interrupted unexpectedly, use `ingestion_metrics.partial.yaml` as the last saved snapshot. Avoid `kill -9`, because no process can save final metrics after `SIGKILL`.
 
-Run baseline locally:
+## Export
+
+Do not export while `measure_ingestion.py` is still running. Stop the foreground process with `Ctrl+C`, or stop the Frontier/background process with `kill "$(cat runs/frontier/$PAL_RUN_ID/adapter.pid)"`, then confirm `ingestion_metrics.yaml` exists.
+
+After ingestion is stopped, validate the run identity:
 
 ```bash
-.venv/bin/python scripts/run/run_local.py --condition baseline --repetition 1 --profile local_smoke
+.venv/bin/python scripts/run/validate_run.py --run-id "$PAL_RUN_ID"
 ```
 
-Replay or watch a Codex JSONL for OPL/DPL after creating the run:
+This fails if the Codex JSONL or Mongo database contains a `pal:...` campaign id different from the manifest campaign id.
 
-```bash
-.venv/bin/python scripts/capture/measure_ingestion.py --run-id <run_id> --duration-sec 5
-```
-
-Build query outputs and metrics:
-
-```bash
-.venv/bin/python scripts/analysis/run_query_suite.py --run-id "$PAL_RUN_ID"
-.venv/bin/python scripts/analysis/build_metrics.py --run-id "$PAL_RUN_ID"
-.venv/bin/python scripts/analysis/build_metrics.py --all
-```
-
-Export a run package, including the Mongo database collections:
+Then package the run:
 
 ```bash
 .venv/bin/python scripts/capture/export_run.py --run-id "$PAL_RUN_ID"
 ```
 
-`scripts/capture/export_mongo.py` is an explicit alias for the same run package export. The package is written to `runs/local/<run_id>/export/` and contains:
+The export package is written under the run directory:
 
-- `mongo/*.json`, one JSON dump per Mongo collection.
-- `manifest.yaml`, `flowcept-settings.yaml`, Codex JSONL, and ingestion/runtime metrics when available.
-- `analysis/` with query outputs and metrics if they were already generated before export.
-
-## Moving A Run To Another Laptop
-
-You can run the direct Mongo queries and later Flowcept Agent queries on another laptop, as long as that laptop has MongoDB and this experiment repo.
-
-On the source machine, after ingestion and analysis:
-
-```bash
-.venv/bin/python scripts/capture/export_run.py --run-id <run_id>
+```text
+runs/frontier/<run_id>/export/
 ```
 
-Copy `runs/local/<run_id>/export/` to the target laptop.
+It includes:
 
-On the target laptop:
+- the manifest, settings, Codex JSONL copy, ingestion metrics, and validation report;
+- run-generated files such as `search_config.yaml`, `run_summary.md`, logs, scripts, and configs;
+- a `run_files/` copy of the run directory, excluding the export directory itself;
+- Mongo JSON dumps for the entire run database, not just a campaign-filtered subset.
+
+The default export refuses invalid runs. Use `--allow-invalid` only to package a broken run for debugging.
+
+## Analyze On Another Laptop
+
+Queries and analysis do not need to run on Frontier unless you specifically want Frontier query latency. The normal workflow is:
+
+1. Run Codex + Flowcept ingestion on the source machine.
+2. Export the package.
+3. Copy the export package to the analysis laptop.
+4. Import into local MongoDB.
+5. Run direct Mongo Q1-Q8 and metrics locally.
+
+On the analysis laptop:
 
 ```bash
 cd <prov-agent-loop-exps>
 scripts/setup/create_venv.sh
-.venv/bin/python scripts/setup/check_environment.py
-.venv/bin/python scripts/capture/import_run.py --package-dir /path/to/export --mongo-db imported_<run_id>
+.venv/bin/python -m pip install -e "../flowcept-agent-loop[ml_dev,extras,dask,codex,telemetry]"
+.venv/bin/python scripts/capture/import_run.py \
+  --package-dir <path-to-export> \
+  --mongo-db imported_<run_id>
 ```
 
-The import command restores the Mongo collections and registers `runs/local/<run_id>/manifest.yaml` with the imported database name, so the analysis scripts can run by `run_id`:
+Run Q1-Q8 direct Mongo checks:
 
 ```bash
 .venv/bin/python scripts/analysis/run_query_suite.py --run-id <run_id>
+```
+
+Build metrics for one run:
+
+```bash
 .venv/bin/python scripts/analysis/build_metrics.py --run-id <run_id>
 ```
 
-For Flowcept Agent queries on another laptop, import the package first, then point the Flowcept/agent configuration at the imported Mongo database and use the prompts in `queries/agent_prompts/`.
+Aggregate all registered runs available on the analysis machine:
+
+```bash
+.venv/bin/python scripts/analysis/build_metrics.py --all
+```
+
+`run_query_suite.py` runs direct Mongo queries on the machine where the Mongo database is available. It is normally run on the analysis laptop after import, not on Frontier.
+
+Flowcept Agent natural-language prompts live in `queries/agent_prompts/`. Those are the prompts to use later for agent-based query answering against the imported database.
 
 ## Outputs
 
-Each run writes to `runs/local/<run_id>/`:
+Per run:
 
-- `manifest.yaml`
-- `flowcept-settings.yaml`
-- `runtime_metrics.yaml` when the workflow runner is used
-- `ingestion_metrics.yaml` when Codex JSONL capture/replay is used
-- `analysis/measurement_table.csv`
-- `analysis/query_completeness.csv`
-- `analysis/query_outputs/Q1.json` through `Q8.json`
-- `export/` with Mongo collections and run artifacts
+- `manifest.yaml`: run id, condition, repetition, campaign id, DB name, JSONL path, settings path.
+- `flowcept-settings.yaml`: online Flowcept config with Mongo, Redis/MQ, campaign, and Codex adapter.
+- `run.env`: shell variables for the active run.
+- `search_config.yaml`: generated by the code assistant during the run.
+- `run_summary.md`: generated by the code assistant at the end of the run.
+- `ingestion_metrics.yaml`: generated by `measure_ingestion.py`.
+- `analysis/query_outputs/Q1.json` through `Q8.json`.
+- `analysis/query_completeness.csv`.
+- `analysis/measurement_table.csv`.
+- `export/`: portable package with Mongo JSON dumps and run artifacts.
 
-Aggregated outputs across all local runs are written to:
+Aggregated analysis outputs:
 
-- `runs/local/analysis/measurement_table.csv`
-- `runs/local/analysis/condition_summary.csv`
+- `runs/local/analysis/measurement_table.csv` for imported/local analysis runs
+- `runs/local/analysis/condition_summary.csv` for imported/local analysis runs
 
-## Local Metrics Collected
+## Metrics Collected By The Harness
 
-The local harness records the metrics that can be measured without Frontier access:
+The scripts collect metrics that are independent from Flowcept telemetry:
 
-- Codex JSONL size and line count before/after ingestion.
-- Adapter runtime and interruption status.
-- Mongo collection counts before/after ingestion and inserted-record deltas.
-- Approximate ingestion throughput in source lines/sec, bytes/sec, and Mongo records/sec.
-- Observer process CPU time and RSS memory before/after adapter execution.
-- Adapter-observed-to-DB-insert latency mean/p95/max when the Flowcept Codex adapter records `custom_metadata.flowcept_capture_observed_at` and the DB consumer records `utc_time_at_insertion`.
-- Direct Mongo Q1-Q8 query latency summary after `run_query_suite.py`.
+- Codex JSONL size and line counts.
+- Adapter ingestion wall time.
+- Mongo collection counts before/after ingestion.
+- Inserted-record deltas filtered by campaign id.
+- Source lines/sec, source bytes/sec, and Mongo records/sec.
+- Observer process CPU time and RSS memory.
+- Insert latency mean/p95/max when timestamps exist in the DB records.
+- Direct Mongo Q1-Q8 query latency mean/p95/max.
 - Token totals discoverable from persisted model-invocation metadata.
-- OPL vs DPL mean token overhead when both conditions have metrics.
 - BSON footprint and class/entity counts from persisted Mongo records.
 
-Frontier-only metrics such as Slurm node-hours, job states, allocation-level telemetry, and GPU activity are left as missing values locally and must be filled by the Frontier run package.
-
-## Frontier
-
-Install Flowcept's `resources/skills/agent-loop-provenance` into the Frontier Codex environment before DPL runs. Then use `prompts/frontier_handoff.md` in the Frontier Codex session.
-
-Frontier should not stop at Step 2. It should run the full validation-scale campaign described in the paper: Dask data preparation and training, fixed seeds/search bounds, validation metrics/losses, checkpoints or model artifacts, Slurm job records, requested nodes, elapsed time/node-hours, and telemetry. It should run the same baseline/OPL/DPL capture conditions, then export the package described in `docs/artifact_contract.md`.
+Frontier-only evidence such as Slurm job ids, node-hours, allocation details, and site scheduler timing must be generated by the Frontier run and preserved in the run directory/package.

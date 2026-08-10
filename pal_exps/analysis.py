@@ -10,7 +10,7 @@ from statistics import mean
 from typing import Any
 
 from .config import load_project, read_yaml, write_yaml
-from .manifest import load_manifest, validate_manifest
+from .manifest import load_manifest, manifest_run_dir, validate_manifest
 from .mongo import bson_size_estimate, collection_names, database
 from .paths import DEFAULT_RUN_ROOT
 
@@ -244,7 +244,8 @@ def run_q(run_id_or_manifest: str, query_id: str) -> dict[str, Any]:
 
 def write_query_suite(run_id_or_manifest: str, output_dir: Path | None = None) -> Path:
     manifest = load_manifest(run_id_or_manifest)
-    out = output_dir or DEFAULT_RUN_ROOT / manifest["run_id"] / "analysis" / "query_outputs"
+    run_path = manifest_run_dir(manifest)
+    out = output_dir or run_path / "analysis" / "query_outputs"
     out.mkdir(parents=True, exist_ok=True)
     rows = []
     for qid in sorted(REQUIRED_BY_QUERY):
@@ -267,11 +268,14 @@ def write_query_suite(run_id_or_manifest: str, output_dir: Path | None = None) -
 
 def write_metrics(run_id_or_manifest: str, output_dir: Path | None = None) -> Path:
     manifest = load_manifest(run_id_or_manifest)
-    out = output_dir or DEFAULT_RUN_ROOT / manifest["run_id"] / "analysis"
+    run_path = manifest_run_dir(manifest)
+    out = output_dir or run_path / "analysis"
     out.mkdir(parents=True, exist_ok=True)
     summary = summarize_run(manifest["run_id"])
-    runtime = read_yaml(DEFAULT_RUN_ROOT / manifest["run_id"] / "runtime_metrics.yaml")
-    ingestion = read_yaml(DEFAULT_RUN_ROOT / manifest["run_id"] / "ingestion_metrics.yaml")
+    runtime = read_yaml(run_path / "runtime_metrics.yaml")
+    ingestion = read_yaml(run_path / "ingestion_metrics.yaml")
+    if not ingestion:
+        ingestion = read_yaml(run_path / "ingestion_metrics.partial.yaml")
     query_latencies = query_latency_summary(out / "query_completeness.csv")
     observer = ingestion.get("observer_resources", {})
     throughput = ingestion.get("throughput", {})
@@ -344,7 +348,8 @@ def write_all_metrics(root: Path = DEFAULT_RUN_ROOT) -> Path:
     rows: list[dict[str, Any]] = []
     for manifest_path in sorted(root.glob("*/manifest.yaml")):
         manifest = load_manifest(str(manifest_path))
-        metrics_path = root / manifest["run_id"] / "analysis" / "measurement_table.csv"
+        run_path = manifest_run_dir(manifest)
+        metrics_path = run_path / "analysis" / "measurement_table.csv"
         try:
             write_metrics(manifest["run_id"])
         except Exception:
@@ -407,7 +412,7 @@ def write_all_metrics(root: Path = DEFAULT_RUN_ROOT) -> Path:
 def build_metrics_main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Build metrics and summary files for one run.")
     parser.add_argument("--run-id", required=False)
-    parser.add_argument("--all", action="store_true", help="Aggregate metrics for all runs under runs/local.")
+    parser.add_argument("--all", action="store_true", help="Aggregate metrics for registered local/imported analysis runs.")
     args = parser.parse_args(argv)
     if args.all:
         print(write_all_metrics())

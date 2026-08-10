@@ -5,3 +5,7 @@
 *egg-info
 
 */local
+.DS_Store
+export/
+export.zip
+*.zip
