@@ -1,19 +1,21 @@
-Work directly on Frontier. The experiment environment is in:
+Work directly on Frontier. The human will provide the absolute path to this run's environment file:
 
 ```bash
-$PAL_RUN_DIR/run.env
+<ABSOLUTE_RUN_ENV_PATH>
 ```
 
-Before running anything, source `run.env` and inspect its variables:
+Before running anything, replace `<ABSOLUTE_RUN_ENV_PATH>` with the path provided by the human, then source that file and inspect its variables:
 
 ```bash
-source "$PAL_RUN_ENV"
+source "<ABSOLUTE_RUN_ENV_PATH>"
 source "$PAL_VENV/bin/activate"
 ```
 
+After sourcing the file, `$PAL_RUN_ENV` should point to the same path. If the human did not provide an absolute run-env path, stop and ask for it before executing commands.
+
 Use the same `$PAL_CAMPAIGN_ID` for all code-assistant provenance and Flowcept-instrumented workflow stages.
 
-Use `$PAL_VENV` for all Python/Dask/Flowcept commands. Do not switch Python environments unless this environment is missing or broken.
+Use `$PAL_VENV` for all Python/Dask/Flowcept commands. Run Python as `"$PAL_VENV/bin/python"` in shell commands and generated Slurm scripts. Do not switch Python environments unless this environment is missing or broken.
 
 Use the Flowcept LLM tutorial checkout configured by the human. If `$PAL_LLM_TUTORIAL_DIR` is set, use that directory. Otherwise, locate it from the configured Flowcept checkout, commonly under:
 
@@ -116,7 +118,7 @@ Submit the existing Slurm workflow using:
 * walltime <= 30 minutes;
 * Stage 1 workflow-params JSON;
 * campaign ID from `$PAL_RUN_DIR/run.env`;
-* the existing environment and specified virtualenv.
+* `"$PAL_VENV/bin/python"` from the run environment.
 
 Record the exact JSON and Slurm job ID.
 

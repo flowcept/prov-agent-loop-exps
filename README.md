@@ -71,11 +71,11 @@ run_id -> campaign_id -> mongo_db
 
 All Codex provenance, Flowcept workflow records, Dask records, metrics, checkpoints, generated scripts, and summaries for that repetition must use the same `$PAL_CAMPAIGN_ID`.
 
-## Run Setup
+## Common Run Setup
 
 Start a new Codex session first, because the JSONL file only exists after the session begins.
 
-For OPL, send a small initializer:
+For baseline or OPL, send a small initializer:
 
 ```text
 hi codex!
@@ -93,19 +93,12 @@ Find the newest Codex JSONL:
 find "${CODEX_HOME:-$HOME/.codex}/sessions" -type f -name 'rollout-*.jsonl' -print0 | xargs -0 ls -t | head -1
 ```
 
-Create the Frontier run manifest and Flowcept settings:
+The condition-specific sections below show the exact `create_manifest.py` command for baseline, OPL, and DPL. They all use this shared setup before creating the manifest:
 
 ```bash
 export PAL_VENV="$PWD/.venv"
 export PAL_FLOWCEPT_ROOT=<path-to-flowcept-checkout>
 export PAL_LLM_TUTORIAL_DIR="$PAL_FLOWCEPT_ROOT/examples/llm_tutorial"
-
-.venv/bin/python scripts/run/create_manifest.py \
-  --condition dpl \
-  --repetition 1 \
-  --profile frontier_template \
-  --codex-jsonl <path-to-rollout.jsonl> \
-  --prompt-path prompts/frontier_handoff.md
 ```
 
 For Frontier, the generated `flowcept-settings.yaml` points to MongoDB at `login07:27017` and creates a unique database name for that run.
@@ -130,26 +123,94 @@ It does not run Codex, run the ML workflow, or choose hyperparameters. The code 
 
 If `PAL_VENV`, `PAL_FLOWCEPT_ROOT`, and `PAL_LLM_TUTORIAL_DIR` are exported before creating the manifest, they are copied into `run.env` so the Codex session can find the Python environment and tutorial without hard-coded user paths. If `PAL_VENV` is omitted, it defaults to `<prov-agent-loop-exps>/.venv`.
 
-Source the run environment in every terminal that will use the run variables:
+Source the run environment and activate the exact Python environment in every terminal that will use the run variables:
 
 ```bash
 source runs/frontier/<run_id>/run.env
 source "$PAL_VENV/bin/activate"
 ```
 
-This exports absolute paths as well as ids. Commands use variables such as `$PAL_RUN_ID`, `$PAL_CAMPAIGN_ID`, `$PAL_MONGO_DB`, `$PAL_RUN_DIR`, `$PAL_RUN_ENV`, `$PAL_SEARCH_CONFIG`, and `$FLOWCEPT_SETTINGS_PATH`.
+This exports absolute paths as well as ids. Commands use variables such as `$PAL_RUN_ID`, `$PAL_CAMPAIGN_ID`, `$PAL_MONGO_DB`, `$PAL_RUN_DIR`, `$PAL_RUN_ENV`, `$PAL_VENV`, `$PAL_SEARCH_CONFIG`, and `$FLOWCEPT_SETTINGS_PATH`.
 
-When prompting Codex, give it the absolute `PAL_RUN_ENV` path and require:
+After sourcing, use this interpreter for run commands:
 
 ```bash
-source "$PAL_RUN_ENV"
+"$PAL_VENV/bin/python"
 ```
 
-Do not let the assistant use a relative `source run.env`; that can silently load an old run from the wrong working directory.
+When prompting Codex, paste `prompts/frontier_handoff.md` and replace `<ABSOLUTE_RUN_ENV_PATH>` with the absolute path printed in `$PAL_RUN_ENV`. The prompt requires Codex to run:
 
-## Capture
+```bash
+source "<ABSOLUTE_RUN_ENV_PATH>"
+source "$PAL_VENV/bin/activate"
+```
 
-Start the adapter in the background before sending the real experiment prompt to Codex:
+Do not let the assistant use a relative `source run.env` or a different Python interpreter; those can silently load an old run or miss the installed Flowcept/experiment dependencies.
+
+## Baseline Run
+
+Baseline may use Codex to help execute the workflow, but it does not ingest the Codex JSONL. Only the Flowcept/Dask workflow provenance is persisted.
+
+Create a baseline manifest:
+
+```bash
+export PAL_VENV="$PWD/.venv"
+export PAL_FLOWCEPT_ROOT=<path-to-flowcept-checkout>
+export PAL_LLM_TUTORIAL_DIR="$PAL_FLOWCEPT_ROOT/examples/llm_tutorial"
+
+.venv/bin/python scripts/run/create_manifest.py \
+  --condition baseline \
+  --repetition 1 \
+  --profile frontier_template \
+  --codex-jsonl <path-to-rollout.jsonl> \
+  --prompt-path prompts/frontier_handoff.md
+```
+
+Then source the run and venv:
+
+```bash
+source runs/frontier/<run_id>/run.env
+source "$PAL_VENV/bin/activate"
+```
+
+Do not run `measure_ingestion.py` for baseline. Return to the same Codex session, paste the experiment prompt, and replace `<ABSOLUTE_RUN_ENV_PATH>` with the absolute `$PAL_RUN_ENV` path. The assistant must run the Flowcept/Dask workflow with the existing `$PAL_CAMPAIGN_ID` and use `$PAL_VENV/bin/python`.
+
+When the workflow is finished, validate and export:
+
+```bash
+.venv/bin/python scripts/run/validate_run.py --run-id "$PAL_RUN_ID"
+.venv/bin/python scripts/capture/export_run.py \
+  --run-id "$PAL_RUN_ID" \
+  --output-root exports/frontier
+```
+
+## OPL Run
+
+OPL ingests the Codex JSONL with declared provenance disabled.
+
+Create an OPL manifest:
+
+```bash
+export PAL_VENV="$PWD/.venv"
+export PAL_FLOWCEPT_ROOT=<path-to-flowcept-checkout>
+export PAL_LLM_TUTORIAL_DIR="$PAL_FLOWCEPT_ROOT/examples/llm_tutorial"
+
+.venv/bin/python scripts/run/create_manifest.py \
+  --condition opl \
+  --repetition 1 \
+  --profile frontier_template \
+  --codex-jsonl <path-to-rollout.jsonl> \
+  --prompt-path prompts/frontier_handoff.md
+```
+
+Source the run and venv:
+
+```bash
+source runs/frontier/<run_id>/run.env
+source "$PAL_VENV/bin/activate"
+```
+
+Start Codex JSONL ingestion before sending the real experiment prompt:
 
 ```bash
 nohup .venv/bin/python scripts/capture/measure_ingestion.py \
@@ -159,23 +220,71 @@ nohup .venv/bin/python scripts/capture/measure_ingestion.py \
 echo $! > "runs/frontier/$PAL_RUN_ID/adapter.pid"
 ```
 
-For OPL/DPL, this starts `Flowcept(interceptors="codex", save_workflow=False, campaign_id=$PAL_CAMPAIGN_ID)` using the generated settings file. The settings use online mode, Redis/MQ, MongoDB, and the Codex adapter pointing at the JSONL from the manifest.
+Return to the same Codex session, paste the experiment prompt, and replace `<ABSOLUTE_RUN_ENV_PATH>` with the absolute `$PAL_RUN_ENV` path. The assistant must use `$PAL_VENV/bin/python`.
 
-For baseline, do not run `measure_ingestion.py`; run the workflow only. If the baseline was assisted by Codex, the manifest `--codex-jsonl` path is still copied during export as raw evidence, but it is not ingested as code-assistant provenance.
-
-While this process is running, return to the same Codex session, enable planning if available, and paste the Frontier experiment prompt:
-
-```text
-$(cat prompts/frontier_handoff.md)
-```
-
-The assistant should create all use-case-specific scripts/configs inside `runs/frontier/<run_id>/`, generate `$PAL_SEARCH_CONFIG`, execute the workflow scope requested by the prompt, evaluate the criteria, and write `$PAL_RUN_SUMMARY`.
-
-When Codex finishes, stop `measure_ingestion.py`:
+When Codex finishes, stop ingestion and export:
 
 ```bash
 kill "$(cat runs/frontier/$PAL_RUN_ID/adapter.pid)"
+.venv/bin/python scripts/run/validate_run.py --run-id "$PAL_RUN_ID"
+.venv/bin/python scripts/capture/export_run.py \
+  --run-id "$PAL_RUN_ID" \
+  --output-root exports/frontier
 ```
+
+## DPL Run
+
+DPL ingests the Codex JSONL with declared provenance enabled. Start the Codex session by explicitly enabling the provenance skill:
+
+```text
+Use $agent-loop-provenance in this session
+```
+
+Create a DPL manifest:
+
+```bash
+export PAL_VENV="$PWD/.venv"
+export PAL_FLOWCEPT_ROOT=<path-to-flowcept-checkout>
+export PAL_LLM_TUTORIAL_DIR="$PAL_FLOWCEPT_ROOT/examples/llm_tutorial"
+
+.venv/bin/python scripts/run/create_manifest.py \
+  --condition dpl \
+  --repetition 1 \
+  --profile frontier_template \
+  --codex-jsonl <path-to-rollout.jsonl> \
+  --prompt-path prompts/frontier_handoff.md
+```
+
+Source the run and venv:
+
+```bash
+source runs/frontier/<run_id>/run.env
+source "$PAL_VENV/bin/activate"
+```
+
+Start ingestion:
+
+```bash
+nohup .venv/bin/python scripts/capture/measure_ingestion.py \
+  --run-id "$PAL_RUN_ID" \
+  --duration-sec 100000 \
+  > "runs/frontier/$PAL_RUN_ID/adapter.log" 2>&1 &
+echo $! > "runs/frontier/$PAL_RUN_ID/adapter.pid"
+```
+
+Return to the same Codex session, paste the experiment prompt, and replace `<ABSOLUTE_RUN_ENV_PATH>` with the absolute `$PAL_RUN_ENV` path. The assistant must use `$PAL_VENV/bin/python`. When Codex finishes, stop ingestion and export:
+
+```bash
+kill "$(cat runs/frontier/$PAL_RUN_ID/adapter.pid)"
+.venv/bin/python scripts/run/validate_run.py --run-id "$PAL_RUN_ID"
+.venv/bin/python scripts/capture/export_run.py \
+  --run-id "$PAL_RUN_ID" \
+  --output-root exports/frontier
+```
+
+## Ingestion Notes
+
+For OPL/DPL, `measure_ingestion.py` starts `Flowcept(interceptors="codex", save_workflow=False, campaign_id=$PAL_CAMPAIGN_ID)` using the generated settings file. The settings use online mode, Redis/MQ, MongoDB, and the Codex adapter pointing at the JSONL from the manifest.
 
 If `--duration-sec` expires first, it stops by itself. In both cases it writes:
 
@@ -203,9 +312,9 @@ The script handles `SIGTERM` and writes the final `ingestion_metrics.yaml`. If t
 
 ## Export
 
-Do not export while `measure_ingestion.py` is still running. Stop the foreground process with `Ctrl+C`, or stop the Frontier/background process with `kill "$(cat runs/frontier/$PAL_RUN_ID/adapter.pid)"`, then confirm `ingestion_metrics.yaml` exists.
+For OPL/DPL, do not export while `measure_ingestion.py` is still running. Stop the foreground process with `Ctrl+C`, or stop the Frontier/background process with `kill "$(cat runs/frontier/$PAL_RUN_ID/adapter.pid)"`, then confirm `ingestion_metrics.yaml` exists. Baseline does not run `measure_ingestion.py`.
 
-After ingestion is stopped, validate the run identity:
+After the run is finished, validate the run identity:
 
 ```bash
 .venv/bin/python scripts/run/validate_run.py --run-id "$PAL_RUN_ID"
