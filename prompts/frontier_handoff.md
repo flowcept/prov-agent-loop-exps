@@ -13,7 +13,7 @@ source "$PAL_VENV/bin/activate"
 
 After sourcing the file, `$PAL_RUN_ENV` should point to the same path. If the human did not provide an absolute run-env path, stop and ask for it before executing commands.
 
-Use the same `$PAL_CAMPAIGN_ID` for all code-assistant provenance and Flowcept-instrumented workflow stages.
+Use the same `$PAL_CAMPAIGN_ID` for all generated run artifacts and Flowcept-instrumented workflow stages.
 
 Use `$PAL_VENV` for all Python/Dask/Flowcept commands. Run Python as `"$PAL_VENV/bin/python"` in shell commands and generated Slurm scripts. Do not switch Python environments unless this environment is missing or broken.
 
