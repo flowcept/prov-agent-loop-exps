@@ -9,9 +9,9 @@ from typing import Any
 
 import yaml
 
-from .config import load_project, write_yaml
+from .config import write_yaml
 from .manifest import load_manifest, manifest_run_dir
-from .mongo import collection_names, database
+from .mongo import collection_names, database_from_manifest
 
 
 CAMPAIGN_RE = re.compile(r"pal:[A-Za-z0-9_.:-]+")
@@ -30,9 +30,8 @@ def campaigns_in_codex_jsonl(path: str | None) -> Counter[str]:
     return counts
 
 
-def campaigns_in_db(mongo_db: str) -> dict[str, Counter[str]]:
-    project = load_project()
-    db = database(project["mongo"], mongo_db)
+def campaigns_in_db(manifest: dict[str, Any]) -> dict[str, Counter[str]]:
+    db = database_from_manifest(manifest)
     result: dict[str, Counter[str]] = {}
     for collection in collection_names(db):
         counter: Counter[str] = Counter()
@@ -59,7 +58,7 @@ def validate_run(run_id_or_manifest: str) -> dict[str, Any]:
     if settings_path.exists():
         settings = yaml.safe_load(settings_path.read_text(encoding="utf-8")) or {}
     jsonl_campaigns = campaigns_in_codex_jsonl(manifest.get("codex_jsonl"))
-    db_campaigns = campaigns_in_db(manifest["mongo_db"])
+    db_campaigns = campaigns_in_db(manifest)
     db_all = Counter()
     for counter in db_campaigns.values():
         db_all.update(counter)

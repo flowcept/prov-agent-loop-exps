@@ -3,7 +3,7 @@ description: Frontier validation profile for the LLM tutorial campaign.
 repetitions: 3
 run_root: runs/frontier
 mongo:
-  host: login12
+  host: login07
   port: 27017
 redis:
   host: login07

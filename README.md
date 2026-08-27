@@ -16,7 +16,7 @@ Default local ports are configured in `project.yaml`:
 - MongoDB: `localhost:27017`
 - Redis: `localhost:6379`
 
-Frontier manifests created with `--profile frontier_template` automatically generate Flowcept settings that persist to MongoDB at `login12:27017`. Redis still defaults to `localhost:6379` unless overridden.
+Frontier manifests created with `--profile frontier_template` automatically generate Flowcept settings that use MongoDB and Redis at `login07`.
 
 If needed for local/debug runs, edit `project.yaml` before creating a manifest.
 
@@ -57,7 +57,7 @@ Check the environment:
 
 ## Conditions
 
-- `baseline`: script/manual workflow run; no Codex JSONL capture.
+- `baseline`: workflow run assisted by Codex if desired, but with no Codex adapter ingestion and no OPL/DPL provenance. Pass `--codex-jsonl` anyway when a Codex session was used so the raw session log is preserved in the export package.
 - `opl`: Codex JSONL capture with declared provenance disabled.
 - `dpl`: Codex JSONL capture with declared provenance enabled. Start the Codex session with `$agent-loop-provenance`.
 
@@ -96,6 +96,10 @@ find "${CODEX_HOME:-$HOME/.codex}/sessions" -type f -name 'rollout-*.jsonl' -pri
 Create the Frontier run manifest and Flowcept settings:
 
 ```bash
+export PAL_VENV="$PWD/.venv"
+export PAL_FLOWCEPT_ROOT=<path-to-flowcept-checkout>
+export PAL_LLM_TUTORIAL_DIR="$PAL_FLOWCEPT_ROOT/examples/llm_tutorial"
+
 .venv/bin/python scripts/run/create_manifest.py \
   --condition dpl \
   --repetition 1 \
@@ -104,7 +108,7 @@ Create the Frontier run manifest and Flowcept settings:
   --prompt-path prompts/frontier_handoff.md
 ```
 
-For Frontier, the generated `flowcept-settings.yaml` points to MongoDB at `login12:27017` and creates a unique database name for that run.
+For Frontier, the generated `flowcept-settings.yaml` points to MongoDB at `login07:27017` and creates a unique database name for that run.
 
 Parameters:
 
@@ -124,10 +128,13 @@ The command only creates infrastructure files:
 
 It does not run Codex, run the ML workflow, or choose hyperparameters. The code assistant generates run-specific files later, including `$PAL_SEARCH_CONFIG`.
 
+If `PAL_VENV`, `PAL_FLOWCEPT_ROOT`, and `PAL_LLM_TUTORIAL_DIR` are exported before creating the manifest, they are copied into `run.env` so the Codex session can find the Python environment and tutorial without hard-coded user paths. If `PAL_VENV` is omitted, it defaults to `<prov-agent-loop-exps>/.venv`.
+
 Source the run environment in every terminal that will use the run variables:
 
 ```bash
 source runs/frontier/<run_id>/run.env
+source "$PAL_VENV/bin/activate"
 ```
 
 This exports absolute paths as well as ids. Commands use variables such as `$PAL_RUN_ID`, `$PAL_CAMPAIGN_ID`, `$PAL_MONGO_DB`, `$PAL_RUN_DIR`, `$PAL_RUN_ENV`, `$PAL_SEARCH_CONFIG`, and `$FLOWCEPT_SETTINGS_PATH`.
@@ -152,7 +159,9 @@ nohup .venv/bin/python scripts/capture/measure_ingestion.py \
 echo $! > "runs/frontier/$PAL_RUN_ID/adapter.pid"
 ```
 
-This starts `Flowcept(interceptors="codex", save_workflow=False, campaign_id=$PAL_CAMPAIGN_ID)` using the generated settings file. The settings use online mode, Redis/MQ, MongoDB, and the Codex adapter pointing at the JSONL from the manifest.
+For OPL/DPL, this starts `Flowcept(interceptors="codex", save_workflow=False, campaign_id=$PAL_CAMPAIGN_ID)` using the generated settings file. The settings use online mode, Redis/MQ, MongoDB, and the Codex adapter pointing at the JSONL from the manifest.
+
+For baseline, do not run `measure_ingestion.py`; run the workflow only. If the baseline was assisted by Codex, the manifest `--codex-jsonl` path is still copied during export as raw evidence, but it is not ingested as code-assistant provenance.
 
 While this process is running, return to the same Codex session, enable planning if available, and paste the Frontier experiment prompt:
 
@@ -202,7 +211,7 @@ After ingestion is stopped, validate the run identity:
 .venv/bin/python scripts/run/validate_run.py --run-id "$PAL_RUN_ID"
 ```
 
-This fails if the Codex JSONL or Mongo database contains a `pal:...` campaign id different from the manifest campaign id.
+This checks that the generated settings point to the manifest campaign/database and that Mongo contains records for the expected campaign. It uses the Mongo host/port from the run `flowcept-settings.yaml`, not the global defaults in `project.yaml`.
 
 Then package the run:
 
@@ -210,10 +219,24 @@ Then package the run:
 .venv/bin/python scripts/capture/export_run.py --run-id "$PAL_RUN_ID"
 ```
 
-The export package is written under the run directory:
+By default, the export package is written under the run directory:
 
 ```text
 runs/frontier/<run_id>/export/
+```
+
+To collect many runs under one parent directory without collisions, use:
+
+```bash
+.venv/bin/python scripts/capture/export_run.py \
+  --run-id "$PAL_RUN_ID" \
+  --output-root exports/frontier
+```
+
+That writes:
+
+```text
+exports/frontier/<run_id>/
 ```
 
 It includes:

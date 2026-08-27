@@ -6,9 +6,9 @@ import time
 from pathlib import Path
 
 from .codex_capture import start_adapter
-from .config import load_project, utc_now, write_yaml
+from .config import utc_now, write_yaml
 from .manifest import load_manifest, manifest_run_dir
-from .mongo import collection_names, database
+from .mongo import collection_names, database_from_manifest
 
 
 def jsonl_stats(path: str | None) -> dict:
@@ -22,9 +22,8 @@ def jsonl_stats(path: str | None) -> dict:
     return {"path": str(jsonl), "exists": True, "bytes": jsonl.stat().st_size, "lines": lines}
 
 
-def mongo_counts(db_name: str, campaign_id: str | None = None) -> dict[str, int]:
-    project = load_project()
-    db = database(project["mongo"], db_name)
+def mongo_counts(manifest: dict, campaign_id: str | None = None) -> dict[str, int]:
+    db = database_from_manifest(manifest)
     counts = {}
     for name in collection_names(db):
         if campaign_id and db[name].count_documents({"campaign_id": {"$exists": True}}):
@@ -89,7 +88,7 @@ def replay_or_watch(run_id: str, duration_sec: float, snapshot_interval_sec: flo
     run_path = manifest_run_dir(manifest)
     final_path = run_path / "ingestion_metrics.yaml"
     partial_path = run_path / "ingestion_metrics.partial.yaml"
-    before_counts = mongo_counts(manifest["mongo_db"], campaign_id=campaign_id)
+    before_counts = mongo_counts(manifest, campaign_id=campaign_id)
     source_stats_before = jsonl_stats(manifest.get("codex_jsonl"))
     resource_before = process_resource_snapshot()
     started = time.perf_counter()
@@ -100,7 +99,7 @@ def replay_or_watch(run_id: str, duration_sec: float, snapshot_interval_sec: flo
     def build_metrics(adapter_metrics: dict, final: bool) -> dict:
         elapsed = time.perf_counter() - started
         resource_after = process_resource_snapshot()
-        after_counts = mongo_counts(manifest["mongo_db"], campaign_id=campaign_id)
+        after_counts = mongo_counts(manifest, campaign_id=campaign_id)
         source_stats_after = jsonl_stats(manifest.get("codex_jsonl"))
         line_delta = source_stats_after["lines"] - source_stats_before["lines"]
         byte_delta = source_stats_after["bytes"] - source_stats_before["bytes"]

@@ -9,3 +9,10 @@
 export/
 export.zip
 *.zip
+frontier_export/
+query_results/
+
+evaluation/
+
+# Generated or downloaded use-case data belongs to individual runs or local caches.
+data/llm_tutorial/

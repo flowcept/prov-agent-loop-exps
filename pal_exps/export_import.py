@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .config import load_project, read_yaml, utc_now, write_yaml
 from .manifest import load_manifest, manifest_run_dir
-from .mongo import collection_names, database, dump_collection, restore_collection, write_json
+from .mongo import collection_names, database, database_from_manifest, dump_collection, restore_collection, write_json
 from .paths import DEFAULT_RUN_ROOT, ROOT
 from .validation import validate_run
 
@@ -32,11 +32,22 @@ def _copy_run_files(run_path: Path, dst: Path) -> None:
     shutil.copytree(run_path, dst, ignore=ignore)
 
 
-def export_package(run_id: str, output_dir: str | None = None, allow_invalid: bool = False) -> Path:
+def export_package(
+    run_id: str,
+    output_dir: str | None = None,
+    output_root: str | None = None,
+    allow_invalid: bool = False,
+) -> Path:
     manifest = load_manifest(run_id)
-    project = load_project()
     run_path = manifest_run_dir(manifest)
-    out = Path(output_dir) if output_dir else run_path / "export"
+    if output_dir:
+        out = Path(output_dir)
+    elif output_root:
+        out = Path(output_root) / manifest["run_id"]
+    else:
+        out = run_path / "export"
+    if out.exists():
+        shutil.rmtree(out)
     out.mkdir(parents=True, exist_ok=True)
     validation = validate_run(run_id)
     write_yaml(out / "validation.yaml", validation)
@@ -53,7 +64,7 @@ def export_package(run_id: str, output_dir: str | None = None, allow_invalid: bo
     _copy_run_files(run_path, out / "run_files")
     if manifest.get("codex_jsonl") and Path(manifest["codex_jsonl"]).exists():
         shutil.copy2(manifest["codex_jsonl"], out / "codex.jsonl")
-    db = database(project["mongo"], manifest["mongo_db"])
+    db = database_from_manifest(manifest)
     mongo_dir = out / "mongo"
     for collection in collection_names(db):
         docs = dump_collection(db, collection)
@@ -97,9 +108,10 @@ def export_main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Export a run package with Mongo data and run artifacts.")
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--output-dir", default=None)
+    parser.add_argument("--output-root", default=None, help="Export to <output-root>/<run_id>.")
     parser.add_argument("--allow-invalid", action="store_true", help="Export even if run/campaign validation fails. Use only for debugging.")
     args = parser.parse_args(argv)
-    print(export_package(args.run_id, args.output_dir, allow_invalid=args.allow_invalid))
+    print(export_package(args.run_id, args.output_dir, output_root=args.output_root, allow_invalid=args.allow_invalid))
 
 
 def import_main(argv: list[str] | None = None) -> None:

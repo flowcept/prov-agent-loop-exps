@@ -9,9 +9,9 @@ from pathlib import Path
 from statistics import mean
 from typing import Any
 
-from .config import load_project, read_yaml, write_yaml
+from .config import read_yaml, write_yaml
 from .manifest import load_manifest, manifest_run_dir, validate_manifest
-from .mongo import bson_size_estimate, collection_names, database
+from .mongo import bson_size_estimate, collection_names, database_from_manifest
 from .paths import DEFAULT_RUN_ROOT
 
 
@@ -38,8 +38,7 @@ def entities_from_payload(payload: Any) -> list[dict[str, Any]]:
 
 
 def load_docs(manifest: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
-    project = load_project()
-    db = database(project["mongo"], manifest["mongo_db"])
+    db = database_from_manifest(manifest)
     campaign_id = manifest.get("campaign_id")
     docs = {}
     for name in collection_names(db):

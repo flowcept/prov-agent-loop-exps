@@ -6,7 +6,7 @@ Every run package should contain:
 - `flowcept-settings.yaml`
 - `search_config.yaml`
 - `mongo/*.json`
-- `codex.jsonl` for OPL and DPL
+- `codex.jsonl` whenever the run was assisted by Codex, including baseline runs where the log is preserved but not ingested
 - workflow stdout/stderr logs
 - adapter logs or ingestion metrics
 - `ingestion_metrics.partial.yaml` when the adapter was still running or stopped unexpectedly
@@ -22,6 +22,14 @@ The standard exporter is:
 ```bash
 .venv/bin/python scripts/capture/export_run.py --run-id <run_id>
 ```
+
+To export many runs under one parent directory without collisions:
+
+```bash
+.venv/bin/python scripts/capture/export_run.py --run-id <run_id> --output-root exports/frontier
+```
+
+This writes `exports/frontier/<run_id>/`.
 
 `scripts/capture/export_mongo.py` is an explicit alias for the same package export. It exports the entire Mongo database for the run plus the run artifacts needed to reproduce direct query results on another machine. The default export fails if the run identity is inconsistent; use `--allow-invalid` only for debugging.
 

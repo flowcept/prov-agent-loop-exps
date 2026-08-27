@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from shlex import quote
 from typing import Any
@@ -126,6 +127,14 @@ def save_run_env(manifest: dict[str, Any], run_path: Path | None = None) -> Path
     if not run_summary_path.is_absolute():
         run_summary_path = ROOT / run_summary_path
     manifest_path = resolved_run_path / "manifest.yaml"
+    project = load_project()
+    profile = profile_config(str(manifest.get("profile", "")))
+    environment = {}
+    environment.update(project.get("environment") or {})
+    environment.update(profile.get("environment") or {})
+    flowcept_root = os.getenv("PAL_FLOWCEPT_ROOT") or environment.get("flowcept_root")
+    llm_tutorial_dir = os.getenv("PAL_LLM_TUTORIAL_DIR") or environment.get("llm_tutorial_dir")
+    venv_path = os.getenv("PAL_VENV") or environment.get("venv") or str((ROOT / ".venv").resolve())
     values = {
         "PAL_RUN_ID": manifest.get("run_id"),
         "PAL_CAMPAIGN_ID": manifest.get("campaign_id"),
@@ -137,6 +146,9 @@ def save_run_env(manifest: dict[str, Any], run_path: Path | None = None) -> Path
         "PAL_PROMPT_PATH": manifest.get("prompt_path"),
         "PAL_SEARCH_CONFIG": str(search_config_path.resolve()),
         "PAL_RUN_SUMMARY": str(run_summary_path.resolve()),
+        "PAL_VENV": venv_path,
+        "PAL_FLOWCEPT_ROOT": flowcept_root,
+        "PAL_LLM_TUTORIAL_DIR": llm_tutorial_dir,
         "FLOWCEPT_SETTINGS_PATH": str(settings_path.resolve()),
     }
     lines = [
